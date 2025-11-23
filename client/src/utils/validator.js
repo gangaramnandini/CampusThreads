@@ -3,24 +3,43 @@ import validator from 'validator';
 export const signupFormValidator = {
   validateForm1: (values) => {
     const errors = {};
-    if (!values.name.trim()) {
+
+    // Name validation
+    if (!values.name || !values.name.trim()) {
       errors.name = 'This is a mandatory field';
     } else if (values.name.length < 2) {
       errors.name = 'Name cannot be less than 2 characters';
     } else if (values.name.length > 100) {
       errors.name = 'Name cannot be more than 100 characters';
     }
-    if (!values.email.trim()) {
+
+    // Email validation
+    if (!values.email || !values.email.trim()) {
       errors.email = 'This is a mandatory field';
     } else if (!validator.isEmail(values.email)) {
       errors.email =
         'Email address is invalid. Please enter a valid email address.';
     }
+
+    if (!values.organization || !values.organization.trim()) {
+      errors.organization = 'Organization name is required';
+    }
+    if (!values.department || !values.department.trim()) {
+      errors.department = 'Department is required';
+    }
+    if (!values.academic_year || !values.academic_year.toString().trim()) {
+      errors.academic_year = 'Academic year is required';
+    }
+    if (!values.roll_number || !values.roll_number.trim()) {
+      errors.roll_number = 'Roll Number is required';
+    }
+
     return errors;
   },
+
   validateForm2: (values) => {
     const errors = {};
-    if (!values.password.trim()) {
+    if (!values.password || !values.password.trim()) {
       errors.password = 'This is a mandatory field';
     } else if (values.password.length < 8) {
       errors.password = 'Password cannot be less than 8 characters';

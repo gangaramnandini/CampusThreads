@@ -8,7 +8,6 @@ import Form2 from './Form2';
 
 import useForm from '../../hooks/useForm';
 import { useAuth } from '../../contexts/auth-context';
-
 import { signupFormValidator } from '../../utils/validator';
 
 const SignupForm = () => {
@@ -19,19 +18,34 @@ const SignupForm = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const validateEmail = useMutation(({ email, name }) => {
-    return axios.post('/api/auth/signup/validate-email', {
+  // eslint-disable-next-line camelcase
+  const validateEmail = useMutation(
+    ({
       email,
       name,
-    });
-  });
+      organization,
+      department,
+      // eslint-disable-next-line camelcase
+      academic_year,
+      // eslint-disable-next-line camelcase
+      roll_number,
+    }) => {
+      return axios.post('/api/auth/signup/validate-email', {
+        email,
+        name,
+        organization,
+        department,
+        // eslint-disable-next-line camelcase
+        academic_year,
+        // eslint-disable-next-line camelcase
+        roll_number,
+      });
+    }
+  );
 
-  const createUser = useMutation(({ email, name, password }) => {
-    return axios.post('/api/auth/signup/create-user', {
-      email,
-      name,
-      password,
-    });
+  // ALL fields now included for createUser:
+  const createUser = useMutation((data) => {
+    return axios.post('/api/auth/signup/create-user', data);
   });
 
   const { validateForm1, validateForm2 } = signupFormValidator;
@@ -40,20 +54,22 @@ const SignupForm = () => {
     initialValues: {
       name: '',
       email: '',
+      organization: '',
+      department: '',
+      // eslint-disable-next-line camelcase
+      academic_year: '',
+      // eslint-disable-next-line camelcase
+      roll_number: '',
     },
     validate: validateForm1,
     onSubmit: async (values) => {
-      const user = {
-        email: values.email,
-        name: values.name,
-      };
-      setUserData({ user });
-      validateEmail.mutate(user, {
+      setUserData({ user: values });
+      validateEmail.mutate(values, {
         onSuccess: () => {
           setActiveFormIndex((prevIndex) => prevIndex + 1);
         },
         onError: (err) => {
-          const error = err.response.data.errors || err.response.data.error;
+          const error = err.response?.data?.errors || err.response?.data.error;
           if (Array.isArray(error)) {
             const errors = error.reduce((acc, cur) => {
               acc[cur.param] = cur.msg;
@@ -72,11 +88,11 @@ const SignupForm = () => {
     },
     validate: validateForm2,
     onSubmit: async (values) => {
+      if (!userData.user) return;
       createUser.mutate(
         {
-          email: userData.user.email,
-          name: userData.user.name,
-          password: values.password,
+          ...userData.user, // All previous fields from Form1
+          password: values.password, // Password from Form2
         },
         {
           onSuccess: (response) => {
@@ -88,7 +104,8 @@ const SignupForm = () => {
             navigate('success');
           },
           onError: (err) => {
-            const error = err.response.data.errors || err.response.data.error;
+            const error =
+              err.response?.data?.errors || err.response?.data?.error;
             if (Array.isArray(error)) {
               const errors = error.reduce((acc, cur) => {
                 acc[cur.param] = cur.msg;

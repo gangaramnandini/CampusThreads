@@ -35,7 +35,7 @@
     "prepare": "cd .. && husky install client/.husky",
     "pre-commit": "lint-staged"
   },
-  "proxy": "http://host.docker.internal:5000",
+  "proxy": "http://localhost:5001",
   "lint-staged": {
     "*.+(js|jsx)": [
       "eslint --fix"

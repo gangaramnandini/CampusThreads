@@ -38,6 +38,28 @@ async function main() {
       },
     });
   }
+
+
+  const vnr = await prisma.organization.upsert({
+    where: { domain: 'vnrvjiet.in' },
+    update: {},
+    create: {
+      name: 'VNR VJIET',
+      domain: 'vnrvjiet.in',
+      country: 'India',
+      is_active: true,
+    },
+  });
+
+  await prisma.department.upsert({
+    where: { id: 'some-uuid' },
+    update: {},
+    create: {
+      organization_id: vnr.id,
+      name: 'Computer Science & Engineering',
+      is_active: true,
+    },
+  });
 }
 
 main()

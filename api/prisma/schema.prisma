@@ -31,7 +31,53 @@ model User {
   chats                 Chat[]         @relation("chat")
   chatsParticipatedIn   Chat[]         @relation("chat participant")
   createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // New nullable fields
+  organization_id       String?       
+  organization          Organization? @relation(fields: [organization_id], references: [id])
+  department_id         String?
+  department            Department?   @relation(fields: [department_id], references: [id])
+  role                  UserRole?
+  academic_year         Int?
+  roll_number           String?
+
+  @@unique([organization_id, roll_number])
 }
+enum UserRole {
+  STUDENT
+  FACULTY
+  ALUMNI
+}
+
+
+model Organization {
+  id          String      @id @default(uuid())
+  name        String
+  domain      String      @unique
+  country     String
+  is_active   Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  users       User[]
+  departments Department[]
+   posts       Post[]
+}
+
+model Department {
+  id             String       @id @default(uuid())
+  organization_id String
+  organization   Organization @relation(fields: [organization_id], references: [id])
+  name           String
+  is_active      Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  users          User[]
+  posts       Post[]
+}
+
 
 model Profile {
   id      Int       @id @default(autoincrement())
@@ -45,17 +91,28 @@ model Profile {
 }
 
 model Post {
-  id           Int      @id @default(autoincrement())
-  content      String   @db.VarChar(255)
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           Int        @id @default(autoincrement())
+  content      String     @db.VarChar(255)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       Int
+
   reposts      Repost[]
   likes        Like[]
+
   parentPostId Int?
-  parentPost   Post?    @relation("PostReplies", fields: [parentPostId], references: [id])
-  replies      Post[]   @relation("PostReplies")
-  createdAt    DateTime @default(now())
+  parentPost   Post?      @relation("PostReplies", fields: [parentPostId], references: [id])
+  replies      Post[]     @relation("PostReplies")
+
+  organizationId String?   // NEW: link to Organization for campus scoping
+  organization  Organization? @relation(fields: [organizationId], references: [id])
+
+  departmentId  String?   // NEW: optional link to Department for finer scope
+  department    Department? @relation(fields: [departmentId], references: [id])
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
+
 
 model Repost {
   id        Int      @id @default(autoincrement())

@@ -40,6 +40,43 @@ const signupSchema = {
         },
       },
     },
+    organization: {
+      trim: true,
+      notEmpty: { errorMessage: 'Organization name is required' },
+      isLength: {
+        options: { min: 2, max: 100 },
+        errorMessage: 'Organization name must be 2 to 100 characters',
+      },
+    },
+    department: {
+      notEmpty: { errorMessage: 'Department is required' },
+      isIn: {
+        options: [['CSE', 'Mechanical', 'Civil', 'IT', 'CSE (AI&ML)', 'CSE (Data Science)']],
+        errorMessage: 'Invalid department',
+      },
+    },
+    academic_year: {
+      notEmpty: { errorMessage: 'Academic year is required' },
+      isInt: { errorMessage: 'Academic year must be a number' },
+      custom: {
+        options: (value) => {
+          if (!/^\d{4}$/.test(String(value))) {
+            throw new Error('Academic year must be 4 digits');
+          }
+          return true;
+        },
+      },
+    },
+    roll_number: {
+      notEmpty: { errorMessage: 'Roll Number is required' },
+      isAlphanumeric: {
+        errorMessage: 'Roll Number should be letters and numbers only',
+      },
+      isLength: {
+        options: { min: 5, max: 20 },
+        errorMessage: 'Roll Number must be between 5 and 20 characters',
+      },
+    },
   },
   validatePassword: {
     password: {
