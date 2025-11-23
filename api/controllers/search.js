@@ -4,6 +4,7 @@ const searchUsersByUsername = async (req, res, next) => {
   const { username } = req.params;
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
+  const organization_id = req.organization_id; // get org ID from auth middleware
 
   try {
     const total = await prisma.user.count({
@@ -12,14 +13,17 @@ const searchUsersByUsername = async (req, res, next) => {
           startsWith: username,
           mode: 'insensitive',
         },
+        organization_id, // restrict to same institution
       },
     });
+
     const users = await prisma.user.findMany({
       where: {
         username: {
           startsWith: username,
           mode: 'insensitive',
         },
+        organization_id, // restrict to same institution
       },
       select: {
         id: true,
@@ -34,6 +38,7 @@ const searchUsersByUsername = async (req, res, next) => {
       skip: (page - 1) * limit,
       take: limit,
     });
+
     return res.status(200).json({
       info: {
         total,
@@ -51,6 +56,7 @@ const searchUsersByName = async (req, res, next) => {
   const { name } = req.params;
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
+  const organization_id = req.organization_id; // get org ID from auth middleware
 
   try {
     const total = await prisma.user.count({
@@ -61,8 +67,10 @@ const searchUsersByName = async (req, res, next) => {
             mode: 'insensitive',
           },
         },
+        organization_id, // restrict to same institution
       },
     });
+
     const users = await prisma.user.findMany({
       where: {
         profile: {
@@ -71,6 +79,7 @@ const searchUsersByName = async (req, res, next) => {
             mode: 'insensitive',
           },
         },
+        organization_id, // restrict to same institution
       },
       select: {
         id: true,
@@ -85,6 +94,7 @@ const searchUsersByName = async (req, res, next) => {
       skip: (page - 1) * limit,
       take: limit,
     });
+
     return res.status(200).json({
       info: {
         total,

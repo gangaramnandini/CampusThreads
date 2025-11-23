@@ -16,6 +16,28 @@ const logger = require('../utils/logger');
 
 const bucket = cloudStorage.bucket(GCP_STORAGE_BUCKET_ID);
 
+/**
+ * Helper to verify that acting user and target user belong to the same organization.
+ * Throws Forbidden error if not.
+ */
+const verifySameOrganization = async (authUserId, targetUserId) => {
+  const authUser = await prisma.user.findUnique({
+    where: { id: authUserId },
+    select: { organization_id: true },
+  });
+  const targetUser = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { organization_id: true },
+  });
+  if (
+    !authUser ||
+    !targetUser ||
+    authUser.organization_id !== targetUser.organization_id
+  ) {
+    throw createError.Forbidden('Action restricted to your institution only');
+  }
+};
+
 const getUserByUsername = async (req, res, next) => {
   const { username } = req.params;
   try {
@@ -175,7 +197,7 @@ const getPostsByUser = async (req, res, next) => {
     );
 
     const startIndex = (page - 1) * limit;
-    const endIndex = (page - 1) * limit + limit;
+    const endIndex = startIndex + limit;
     const slicedPosts = combinedPosts.slice(startIndex, endIndex);
 
     return res.status(200).json({
@@ -262,32 +284,27 @@ const getLikedPostsByUser = async (req, res, next) => {
   }
 };
 
+// Updated to enforce institution based restriction
 const followUser = async (req, res, next) => {
   const { followeeId } = req.body;
   const { userId } = req;
   try {
+    if (followeeId === userId) {
+      throw createError.Forbidden('Cannot follow yourself');
+    }
+    await verifySameOrganization(userId, Number(followeeId));
+
     const followee = await prisma.user.findUnique({
-      where: {
-        id: Number(followeeId),
-      },
+      where: { id: Number(followeeId) },
     });
     if (!followee) {
-      const error = createError.NotFound();
-      throw error;
-    }
-    if (followee.id === userId) {
-      const error = createError.Forbidden();
-      throw error;
+      throw createError.NotFound('User to follow not found');
     }
     await prisma.user.update({
-      where: {
-        id: userId,
-      },
+      where: { id: userId },
       data: {
         following: {
-          connect: {
-            id: Number(followeeId),
-          },
+          connect: { id: Number(followeeId) },
         },
       },
     });
@@ -297,7 +314,7 @@ const followUser = async (req, res, next) => {
         recipientId: followee.id,
         type: NOTIFICATION_TYPE.FOLLOW,
         objectType: NOTIFICATION_OBJECT_TYPE.USER,
-        objectURI: userId,
+        objectURI: userId, // integer as per schema
       },
     });
     return res.status(200).json({ followeeId: followee.id });
@@ -306,34 +323,27 @@ const followUser = async (req, res, next) => {
   }
 };
 
+// Updated to enforce institution based restriction
 const unFollowUser = async (req, res, next) => {
   const { followeeId } = req.body;
   const { userId } = req;
   try {
+    if (followeeId === userId) {
+      throw createError.Forbidden('Cannot unfollow yourself');
+    }
+    await verifySameOrganization(userId, Number(followeeId));
+
     const followee = await prisma.user.findUnique({
-      where: {
-        id: Number(followeeId),
-      },
+      where: { id: Number(followeeId) },
     });
     if (!followee) {
-      const error = createError.NotFound();
-      throw error;
-    }
-    if (followee.id === userId) {
-      const error = createError.Forbidden();
-      throw error;
+      throw createError.NotFound('User to unfollow not found');
     }
     await prisma.user.update({
-      where: {
-        id: userId,
-      },
+      where: { id: userId },
       data: {
         following: {
-          disconnect: [
-            {
-              id: followee.id,
-            },
-          ],
+          disconnect: [{ id: followee.id }],
         },
       },
     });
@@ -343,55 +353,46 @@ const unFollowUser = async (req, res, next) => {
   }
 };
 
+// Updated to enforce institution based restriction
 const getFollowersList = async (req, res, next) => {
   const { id } = req.params;
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   try {
-    const user = await prisma.user.findUnique({
-      where: {
-        id: Number(id),
-      },
+    const authUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { organization_id: true },
     });
-    if (!user) {
-      const error = createError.NotFound();
-      throw error;
+    const targetUser = await prisma.user.findUnique({
+      where: { id: Number(id) },
+      select: { organization_id: true },
+    });
+    if (
+      !authUser ||
+      !targetUser ||
+      authUser.organization_id !== targetUser.organization_id
+    ) {
+      throw createError.Forbidden('Cannot view followers outside your institution');
     }
     const total = await prisma.user.count({
       where: {
-        following: {
-          some: {
-            id: Number(id),
-          },
-        },
+        following: { some: { id: Number(id) } },
+        organization_id: authUser.organization_id,
       },
     });
     const followers = await prisma.user.findMany({
       where: {
-        following: {
-          some: {
-            id: Number(id),
-          },
-        },
+        following: { some: { id: Number(id) } },
+        organization_id: authUser.organization_id,
       },
       skip: (page - 1) * limit,
       take: limit,
-      select: {
-        id: true,
-        username: true,
-        profile: {
-          select: {
-            name: true,
-            img: true,
-          },
-        },
-      },
+      select: { id: true, username: true, profile: { select: { name: true, img: true } } },
     });
     return res.status(200).json({
       info: {
         total,
-        nextPage:
-          total > (page - 1) * limit + followers.length ? page + 1 : null,
+        nextPage: total > (page - 1) * limit + followers.length ? page + 1 : null,
         prevPage: page === 1 ? null : page - 1,
       },
       results: followers,
@@ -401,55 +402,46 @@ const getFollowersList = async (req, res, next) => {
   }
 };
 
+// Updated to enforce institution based restriction
 const getFolloweesList = async (req, res, next) => {
   const { id } = req.params;
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   try {
-    const user = await prisma.user.findUnique({
-      where: {
-        id: Number(id),
-      },
+    const authUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { organization_id: true },
     });
-    if (!user) {
-      const error = createError.NotFound();
-      throw error;
+    const targetUser = await prisma.user.findUnique({
+      where: { id: Number(id) },
+      select: { organization_id: true },
+    });
+    if (
+      !authUser ||
+      !targetUser ||
+      authUser.organization_id !== targetUser.organization_id
+    ) {
+      throw createError.Forbidden('Cannot view followees outside your institution');
     }
     const total = await prisma.user.count({
       where: {
-        followedBy: {
-          some: {
-            id: Number(id),
-          },
-        },
+        followedBy: { some: { id: Number(id) } },
+        organization_id: authUser.organization_id,
       },
     });
     const followees = await prisma.user.findMany({
       where: {
-        followedBy: {
-          some: {
-            id: Number(id),
-          },
-        },
+        followedBy: { some: { id: Number(id) } },
+        organization_id: authUser.organization_id,
       },
       skip: (page - 1) * limit,
       take: limit,
-      select: {
-        id: true,
-        username: true,
-        profile: {
-          select: {
-            name: true,
-            img: true,
-          },
-        },
-      },
+      select: { id: true, username: true, profile: { select: { name: true, img: true } } },
     });
     return res.status(200).json({
       info: {
         total,
-        nextPage:
-          total > (page - 1) * limit + followees.length ? page + 1 : null,
+        nextPage: total > (page - 1) * limit + followees.length ? page + 1 : null,
         prevPage: page === 1 ? null : page - 1,
       },
       results: followees,
@@ -458,6 +450,7 @@ const getFolloweesList = async (req, res, next) => {
     return next(error);
   }
 };
+
 
 const getRepliesByUser = async (req, res, next) => {
   const { id } = req.params;
@@ -550,6 +543,7 @@ const getRepliesByUser = async (req, res, next) => {
   }
 };
 
+
 const updateProfile = async (req, res, next) => {
   const { userId } = req;
   const { name, bio, website, dateOfBirth } = req.body;
@@ -610,6 +604,7 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+
 const getAuthUserInfo = async (req, res, next) => {
   const { userId } = req;
   try {
@@ -630,6 +625,7 @@ const getAuthUserInfo = async (req, res, next) => {
     return next(error);
   }
 };
+
 
 const updateUsername = async (req, res, next) => {
   const { userId } = req;
@@ -667,6 +663,7 @@ const updateUsername = async (req, res, next) => {
   }
 };
 
+
 const updateEmail = async (req, res, next) => {
   const { userId } = req;
   const { email } = req.body;
@@ -702,6 +699,7 @@ const updateEmail = async (req, res, next) => {
     return next(error);
   }
 };
+
 
 const updateDateOfBirth = async (req, res, next) => {
   const { userId } = req;
@@ -743,6 +741,7 @@ const updateDateOfBirth = async (req, res, next) => {
     return next(error);
   }
 };
+
 
 module.exports = {
   getUserByUsername,
