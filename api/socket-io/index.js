@@ -13,6 +13,7 @@ const setupSocketServer = (server) => {
     cors: {
       origin: 'http://localhost:3000',
       optionsSuccessStatus: 200,
+      methods: ['GET', 'POST'],
       credentials: true,
     }
   } : {};

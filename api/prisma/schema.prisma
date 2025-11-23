@@ -103,14 +103,14 @@ model Post {
   parentPost   Post?      @relation("PostReplies", fields: [parentPostId], references: [id])
   replies      Post[]     @relation("PostReplies")
 
-  organizationId String?   // NEW: link to Organization for campus scoping
+  organizationId String?   // Link to Organization for campus scoping
   organization  Organization? @relation(fields: [organizationId], references: [id])
 
-  departmentId  String?   // NEW: optional link to Department for finer scope
+  departmentId  String?   // Optional for finer scope by Department
   department    Department? @relation(fields: [departmentId], references: [id])
 
   createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  updatedAt    DateTime   @default(now()) @updatedAt
 }
 
 

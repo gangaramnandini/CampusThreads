@@ -15,7 +15,6 @@ const {
 } = require('../utils/config');
 
 const nanoid = customAlphabet('1234567890', 10);
-
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const loginPassword = async (req, res, next) => {
@@ -59,13 +58,22 @@ const signupPassword = {
     const { email, name, password, organization, department, academic_year, roll_number } = req.body;
 
     try {
-      // 1. Find or create organization by name (case-insensitive)
-      let org = await prisma.organization.findFirst({
-        where: { name: { equals: organization, mode: 'insensitive' } }
+      // Generate a domain from organization name (simple slug plus .edu)
+      const domain = organization.toLowerCase().replace(/\s+/g, '') + '.edu';
+
+      // 1. Find or create organization by domain (unique)
+      let org = await prisma.organization.findUnique({
+        where: { domain },
       });
+
       if (!org) {
         org = await prisma.organization.create({
-          data: { name: organization, domain: '', country: '', is_active: true }
+          data: {
+            name: organization,
+            domain,
+            country: '', // optionally accept from req or set default
+            is_active: true,
+          },
         });
       }
 
@@ -74,22 +82,22 @@ const signupPassword = {
         where: {
           name: department,
           organization_id: org.id,
-        }
+        },
       });
       if (!dept) {
         dept = await prisma.department.create({
-          data: { name: department, organization_id: org.id, is_active: true }
+          data: { name: department, organization_id: org.id, is_active: true },
         });
       }
 
-      // 3. Hash the password
+      // 3. Hash password
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // 4. Generate username
+      // 4. Generate username using first name + random number
       const username = name.toLowerCase().split(' ')[0] + nanoid();
 
-      // 5. Create user
+      // 5. Create user with organization and department links
       const user = await prisma.user.create({
         data: {
           email: email.toLowerCase(),

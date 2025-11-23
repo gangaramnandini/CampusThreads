@@ -14,7 +14,7 @@ const SocketProvider = ({ children }) => {
     let socketIO = null;
     if (isAuthenticated) {
       socketIO = io(
-        process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '',
+        process.env.NODE_ENV === 'development' ? 'http://localhost:5001' : '',
         {
           withCredentials: true,
           extraHeaders: {

@@ -4,67 +4,102 @@ const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 
 const prisma = require('../services/connect-db');
-const { generateJWT, COOKIE_OPTIONS } = require('../utils/auth');
 const {
   ACCESS_TOKEN_SECRET,
   ACCESS_TOKEN_LIFE,
   REFRESH_TOKEN_SECRET,
   REFRESH_TOKEN_LIFE,
 } = require('../utils/config');
+const { generateJWT, COOKIE_OPTIONS } = require('../utils/auth');
 
 const isAuthenticated = async (req, res, next) => {
   try {
-    const authToken = req.get('Authorization');
-    const accessToken = authToken?.split('Bearer ')[1];
+    // 1. Get access token from Authorization header
+    const authHeader = req.get('Authorization');
+    const accessToken =
+      authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.slice('Bearer '.length)
+        : null;
+
     if (!accessToken) {
-      const error = createError.Unauthorized();
-      throw error;
+      throw createError.Unauthorized('Access token missing');
     }
-    const { signedCookies = {} } = req;
-    const { refreshToken } = signedCookies;
+
+    // 2. Get refresh token from signed cookies
+    const { refreshToken } = req.signedCookies || {};
     if (!refreshToken) {
-      const error = createError.Unauthorized();
-      throw error;
+      throw createError.Unauthorized('Refresh token missing');
     }
-    const refreshTokenInDB = await prisma.session.findFirst({
-      where: {
-        refreshToken,
-      },
+
+    // 3. Ensure refresh token exists in Session table
+    const session = await prisma.session.findFirst({
+      where: { refreshToken },
     });
-    if (!refreshTokenInDB) {
-      const error = createError.Unauthorized();
-      throw error;
+    if (!session) {
+      throw createError.Unauthorized('Invalid session');
     }
+
+    // 4. Verify access token
     let decodedToken;
     try {
       decodedToken = jwt.verify(accessToken, ACCESS_TOKEN_SECRET);
     } catch (err) {
-      const error = createError.Unauthorized();
-      return next(error);
+      throw createError.Unauthorized('Invalid access token');
     }
-    const { userId } = decodedToken;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      const error = createError.Unauthorized();
-      throw error;
+
+    // (Optional but safer) ensure token user matches session user
+    if (decodedToken.userId !== session.userId) {
+      throw createError.Unauthorized('Token does not match session');
     }
+
+    // 5. Fetch user with campus info
+    const dbUser = await prisma.user.findUnique({
+      where: { id: decodedToken.userId },
+      select: {
+        id: true,
+        organization_id: true,
+        department_id: true,
+        role: true,
+      },
+    });
+
+    if (!dbUser) {
+      throw createError.Unauthorized('User not found');
+    }
+
+    // 6. Normalize to a clean `req.user` object (camelCase)
+    const user = {
+      id: dbUser.id,
+      organizationId: dbUser.organization_id,
+      departmentId: dbUser.department_id,
+      role: dbUser.role,
+    };
+
+    // Attach to req
+    req.user = user;
+
+    // Backwards-compatible aliases if other code still expects them:
     req.userId = user.id;
-    return next();
+    req.organizationId = user.organizationId;
+    req.departmentId = user.departmentId;
+    req.userRole = user.role;
+    req.organization_id = dbUser.organization_id; // if any old code still uses snake_case
+    req.department_id = dbUser.department_id;
+
+    next();
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
 
 const generateAuthTokens = async (req, res, next) => {
   try {
     if (!req.userId) {
-      const error = createError.InternalServerError();
-      throw error;
+      throw createError.InternalServerError('User id missing for token generation');
     }
+
     const user = await prisma.user.findUnique({
-      where: {
-        id: req.userId,
-      },
+      where: { id: req.userId },
       select: {
         id: true,
         email: true,
@@ -74,12 +109,19 @@ const generateAuthTokens = async (req, res, next) => {
         provider: true,
         createdAt: true,
         profile: true,
+        organization_id: true,
+        department_id: true,
+        role: true,
+        academic_year: true,
+        roll_number: true,
       },
     });
+
     if (!user) {
-      const error = createError.Unauthorized();
-      throw error;
+      throw createError.Unauthorized('User not found');
     }
+
+    // Generate tokens
     const refreshToken = generateJWT(
       req.userId,
       REFRESH_TOKEN_SECRET,
@@ -90,10 +132,10 @@ const generateAuthTokens = async (req, res, next) => {
       ACCESS_TOKEN_SECRET,
       ACCESS_TOKEN_LIFE
     );
+
+    // Store refresh token as a session
     await prisma.user.update({
-      where: {
-        id: user.id,
-      },
+      where: { id: user.id },
       data: {
         sessions: {
           create: {
@@ -103,45 +145,49 @@ const generateAuthTokens = async (req, res, next) => {
         },
       },
     });
+
+    // Send refresh token as HttpOnly cookie
     res.cookie('refreshToken', refreshToken, {
       ...COOKIE_OPTIONS,
       expires: new Date(Date.now() + ms(REFRESH_TOKEN_LIFE)),
     });
-    return res.status(200).json({
+
+    // Respond with access token + user
+    res.status(200).json({
       user,
       accessToken,
       expiresAt: new Date(Date.now() + ms(ACCESS_TOKEN_LIFE)),
     });
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
 
 const validateRequest = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({
-      errors: errors.array({ onlyFirstError: true }),
-    });
+    return res
+      .status(400)
+      .json({ errors: errors.array({ onlyFirstError: true }) });
   }
   return next();
 };
 
 const isValidUser = async (req, res, next) => {
-  const { id } = req.params;
   try {
+    const { id } = req.params;
+
     const user = await prisma.user.findUnique({
-      where: {
-        id: Number(id),
-      },
+      where: { id: Number(id) },
     });
+
     if (!user) {
-      const error = createError.NotFound();
-      throw error;
+      throw createError.NotFound('User not found');
     }
-    return next();
+
+    next();
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
 
