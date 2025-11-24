@@ -1,6 +1,27 @@
 const createError = require('http-errors');
-
 const prisma = require('../services/connect-db');
+
+/**
+ * Helper to verify both users belong to the same institution.
+ * Throws Forbidden if not.
+ */
+const verifySameOrganization = async (userId1, userId2) => {
+  const user1 = await prisma.user.findUnique({
+    where: { id: userId1 },
+    select: { organization_id: true },
+  });
+  const user2 = await prisma.user.findUnique({
+    where: { id: userId2 },
+    select: { organization_id: true },
+  });
+  if (
+    !user1 ||
+    !user2 ||
+    user1.organization_id !== user2.organization_id
+  ) {
+    throw createError.Forbidden('Action restricted to your institution only');
+  }
+};
 
 const getAllChatsOfUser = async (req, res, next) => {
   const { userId } = req;
@@ -39,9 +60,11 @@ const findOrCreateNewChat = async (req, res, next) => {
   const { participantId } = req.body;
   try {
     if (userId === Number(participantId)) {
-      const error = createError.Forbidden();
-      throw error;
+      throw createError.Forbidden('Cannot chat with yourself');
     }
+    // Verify same organization before proceeding
+    await verifySameOrganization(userId, Number(participantId));
+
     const existingChat = await prisma.chat.findFirst({
       where: {
         userId,
@@ -66,14 +89,8 @@ const findOrCreateNewChat = async (req, res, next) => {
     }
     const chat = await prisma.chat.create({
       data: {
-        user: {
-          connect: { id: userId },
-        },
-        participant: {
-          connect: {
-            id: Number(participantId),
-          },
-        },
+        user: { connect: { id: userId } },
+        participant: { connect: { id: Number(participantId) } },
       },
     });
     return res.status(201).json(chat);
@@ -122,9 +139,12 @@ const getChatById = async (req, res, next) => {
       },
     });
     if (!chat) {
-      const error = createError.NotFound();
-      throw error;
+      throw createError.NotFound();
     }
+
+    // Verify institution of both chat participants before returning
+    await verifySameOrganization(userId, chat.participantId);
+
     return res.status(200).json({ chat });
   } catch (error) {
     return next(error);
@@ -143,39 +163,31 @@ const addNewMessageToChat = async (req, res, next) => {
       },
     });
     if (!chat) {
-      const error = createError.NotFound();
-      throw error;
+      throw createError.NotFound();
     }
-    const { participantId } = chat;
+
+    // Verify institution alignment for sender and receiver
+    await verifySameOrganization(userId, chat.participantId);
+
     let chatParticipatedIn = await prisma.chat.findFirst({
       where: {
-        userId: participantId,
+        userId: chat.participantId,
         participantId: userId,
       },
     });
     if (!chatParticipatedIn) {
       chatParticipatedIn = await prisma.chat.create({
         data: {
-          user: {
-            connect: { id: participantId },
-          },
-          participant: {
-            connect: {
-              id: userId,
-            },
-          },
+          user: { connect: { id: chat.participantId } },
+          participant: { connect: { id: userId } },
         },
       });
     }
     const message = await prisma.message.create({
       data: {
         content,
-        user: {
-          connect: { id: userId },
-        },
-        chats: {
-          connect: [{ id: chat.id }, { id: chatParticipatedIn.id }],
-        },
+        user: { connect: { id: userId } },
+        chats: { connect: [{ id: chat.id }, { id: chatParticipatedIn.id }] },
       },
     });
     return res.status(201).json({ message });
@@ -195,16 +207,15 @@ const markMessagesAsRead = async (req, res, next) => {
       },
     });
     if (!chat) {
-      const error = createError.NotFound();
-      throw error;
+      throw createError.NotFound();
     }
+
+    // Confirm institution alignment for marking messages
+    await verifySameOrganization(userId, chat.participantId);
+
     await prisma.message.updateMany({
-      where: {
-        userId: chat.participantId,
-      },
-      data: {
-        read: true,
-      },
+      where: { userId: chat.participantId },
+      data: { read: true },
     });
     return res.status(200).json({ message: 'success' });
   } catch (error) {
