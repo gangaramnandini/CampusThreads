@@ -35,7 +35,7 @@ const Home = () => {
           const response = await axios.get(`/api/feed/home`, {
             params: {
               page: pageParam,
-              limit: 5,
+              limit: 20, // More posts per load, Twitter-like
             },
           });
           return response.data;
@@ -99,36 +99,38 @@ const Home = () => {
       <div className="sticky top-0 left-0 w-full z-[100]">
         <PageHeader title="Home" />
       </div>
-      <div className="border-b border-on-surface/30">
-        <ComposePost />
-      </div>
-      <div className="mt-1 mb-14 pb-20">
-        {data.pages[0].info.total === 0 && (
-          <div className="mt-2">
-            <h1 className="text-lg text-on-surface font-bold text-center px-20">
-              Posts of people you follow will show up here.
-            </h1>
+      {/* Feed aligned left and bordered */}
+      <div className="flex">
+        <div className="w-full max-w-2xl px-2 border-r border-gray-700 min-h-screen">
+          <div className="border-b border-on-surface/30">
+            <ComposePost />
           </div>
-        )}
-        {data.pages.map((group, i) => {
-          return (
-            // eslint-disable-next-line react/no-array-index-key
-            <Fragment key={i}>
-              {group.results.map((post) =>
-                post.post ? (
-                  <Repost key={`${post.id}${post.post.id}`} repost={post} />
-                ) : (
-                  <Post post={post} key={post.id} />
-                )
-              )}
-            </Fragment>
-          );
-        })}
-        {hasNextPage && (
-          <div ref={ref} className="h-2 text-center">
-            <Spinner />
+          <div className="mt-1 mb-14 pb-20">
+            {data.pages[0].info.total === 0 && (
+              <div className="mt-2">
+                <h1 className="text-lg text-on-surface font-bold text-center px-20">
+                  Posts of people you follow will show up here.
+                </h1>
+              </div>
+            )}
+            {data.pages.map((group) => (
+              <Fragment key={group.info?.page || group.results[0]?.id}>
+                {group.results.map((post) =>
+                  post.post ? (
+                    <Repost key={`${post.id}${post.post.id}`} repost={post} />
+                  ) : (
+                    <Post post={post} key={post.id} />
+                  )
+                )}
+              </Fragment>
+            ))}
+            {hasNextPage && (
+              <div ref={ref} className="h-2 text-center">
+                <Spinner />
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
       <div className="fixed right-10 bottom-20 z-50">
         <Fab label="new post" onClick={openModal} />

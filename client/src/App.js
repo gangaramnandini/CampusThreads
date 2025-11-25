@@ -37,6 +37,7 @@ import ChangeEmail from './pages/Settings/ChangeEmail';
 import ChangeBirthDate from './pages/Settings/ChangeBirthDate';
 import EditProfile from './pages/Settings/EditProfile';
 import Display from './pages/Settings/Display';
+import ChannelsPage from './pages/ChannelsPage';
 
 import Layout from './components/Layout';
 import SplashScreen from './components/SplashScreen';
@@ -171,6 +172,14 @@ const App = () => {
             }
           />
           <Route
+            path="channels"
+            element={
+              <RequireAuth redirectTo="/signin">
+                <ChannelsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="settings"
             element={
               <RequireAuth redirectTo="/signup">
@@ -267,6 +276,7 @@ const App = () => {
               />
             )}
           </Route>
+
           <Route
             path="/:username"
             element={

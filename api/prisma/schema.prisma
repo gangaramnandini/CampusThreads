@@ -43,6 +43,11 @@ model User {
   roll_number           String?
 
   @@unique([organization_id, roll_number])
+
+
+   // New relations for channels (optional virtual fields)
+  channelMemberships   ChannelMembership[]  @relation("UserChannelMemberships")
+  channelMessages      ChannelMessage[]     @relation("UserChannelMessages")
 }
 enum UserRole {
   STUDENT
@@ -178,3 +183,45 @@ model Message {
   createdAt DateTime @default(now())
   read      Boolean  @default(false)
 }
+
+
+
+model Channel {
+  id             Int                  @id @default(autoincrement())
+  name           String
+  organizationId String               // UUID string for organization ID
+  type           String               // e.g., "public", "private"
+  createdBy      Int
+  description    String?
+  createdAt      DateTime             @default(now())
+  memberships    ChannelMembership[]
+  messages       ChannelMessage[]
+
+  @@index([organizationId])
+}
+
+model ChannelMembership {
+  id         Int      @id @default(autoincrement())
+  channelId  Int
+  userId     Int
+  role       String   // e.g., "admin", "member"
+  joinedAt   DateTime @default(now())
+
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user       User     @relation("UserChannelMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+
+model ChannelMessage {
+  id         Int      @id @default(autoincrement())
+  channelId  Int
+  userId     Int
+  content    String
+  createdAt  DateTime @default(now())
+
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user       User     @relation("UserChannelMessages", fields: [userId], references: [id], onDelete: Cascade)
+}
+

@@ -87,6 +87,16 @@ const AccountInfo = () => {
             </NavLink>
           </li>
           <li className="pb-4">
+            <div className="px-4">
+              <div>
+                <p className="text-on-surface">Roll Number</p>
+                <p className="text-sm text-on-surface/70 -mt-1">
+                  {data.user.roll_number || '-'}
+                </p>
+              </div>
+            </div>
+          </li>
+          <li className="pb-4">
             <NavLink to="/settings/email">
               <div className="flex justify-between items-center px-4">
                 <div>
@@ -135,11 +145,22 @@ const AccountInfo = () => {
             </NavLink>
           </li>
           <li className="pb-4">
-            <div className="flex justify-between items-center px-4">
+            <div className="px-4">
               <div>
-                <p className="text-on-surface">Account creation</p>
+                <p className="text-on-surface">Age</p>
                 <p className="text-sm text-on-surface/70 -mt-1">
-                  {dayjs(data.user.createdAt).format('MMM D, YYYY, h:mm:ss A')}
+                  {dayjs().diff(dayjs(data.user.profile.dob), 'year')}
+                </p>
+              </div>
+            </div>
+          </li>
+
+          <li className="pb-4">
+            <div className="px-4">
+              <div>
+                <p className="text-on-surface">Academic Year</p>
+                <p className="text-sm text-on-surface/70 -mt-1">
+                  {data.user.academic_year || '-'}
                 </p>
               </div>
             </div>
@@ -147,9 +168,29 @@ const AccountInfo = () => {
           <li className="pb-4">
             <div className="px-4">
               <div>
-                <p className="text-on-surface">Age</p>
+                <p className="text-on-surface">Department</p>
                 <p className="text-sm text-on-surface/70 -mt-1">
-                  {dayjs().diff(dayjs(data.user.profile.dob), 'year')}
+                  {data.user.department?.name || '-'}
+                </p>
+              </div>
+            </div>
+          </li>
+          <li className="pb-4">
+            <div className="px-4">
+              <div>
+                <p className="text-on-surface">Organization</p>
+                <p className="text-sm text-on-surface/70 -mt-1">
+                  {data.user.organization?.name || '-'}
+                </p>
+              </div>
+            </div>
+          </li>
+          <li className="pb-4">
+            <div className="flex justify-between items-center px-4">
+              <div>
+                <p className="text-on-surface">Account creation</p>
+                <p className="text-sm text-on-surface/70 -mt-1">
+                  {dayjs(data.user.createdAt).format('MMM D, YYYY, h:mm:ss A')}
                 </p>
               </div>
             </div>

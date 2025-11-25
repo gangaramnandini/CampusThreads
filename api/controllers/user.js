@@ -616,8 +616,16 @@ const getAuthUserInfo = async (req, res, next) => {
         id: true,
         email: true,
         username: true,
-        profile: true,
         createdAt: true,
+        roll_number: true,
+        academic_year: true,
+        profile: true,
+        organization: {
+          select: { name: true }
+        },
+        department: {
+          select: { name: true }
+        }
       },
     });
     return res.status(200).json({ user });
@@ -625,6 +633,7 @@ const getAuthUserInfo = async (req, res, next) => {
     return next(error);
   }
 };
+
 
 
 const updateUsername = async (req, res, next) => {

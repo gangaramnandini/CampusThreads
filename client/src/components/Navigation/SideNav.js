@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { IconContext } from 'react-icons';
 import { useMutation, useQueryClient } from 'react-query';
+
 import {
   RiShareLine,
   RiHome7Line,
@@ -17,6 +18,7 @@ import {
   RiUserFill,
   RiSettingsLine,
   RiSettingsFill,
+  RiShareFill,
 } from 'react-icons/ri';
 import toast from 'react-hot-toast';
 
@@ -226,6 +228,38 @@ const SideNav = () => {
                 )}
               </NavLink>
             </li>
+            <li className="text-on-surface mb-3">
+              <NavLink to="/channels" aria-label="Channels">
+                {({ isActive }) => (
+                  <div
+                    className={`flex items-center gap-3 rounded-3xl px-4 py-2 w-fit ${
+                      isActive && 'bg-on-surface/10'
+                    }`}
+                  >
+                    <span>
+                      <IconContext.Provider
+                        value={{
+                          size: '24px',
+                          style: {
+                            color: 'inherit',
+                          },
+                        }}
+                      >
+                        {isActive ? <RiShareFill /> : <RiShareLine />}
+                      </IconContext.Provider>
+                    </span>
+                    <span
+                      className={`text-xl ${
+                        isActive && 'font-semibold'
+                      } sm:hidden lg:inline`}
+                    >
+                      Channels
+                    </span>
+                  </div>
+                )}
+              </NavLink>
+            </li>
+
             <li className="text-on-surface mb-3">
               <NavLink to={`/${user.username}`} aria-label="Profile">
                 {({ isActive }) => (
